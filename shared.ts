@@ -182,6 +182,7 @@ export function launchRun(metadata: RunMetadata, initialArgs: string[] = []): vo
 			"--",
 			"env",
 			`PI_SUBAGENT_RUN_DIR=${metadata.runDir}`,
+			...(process.env.PI_CODING_AGENT_DIR ? [`PI_CODING_AGENT_DIR=${process.env.PI_CODING_AGENT_DIR}`] : []),
 			launcher,
 			"--session",
 			metadata.sessionFile,
