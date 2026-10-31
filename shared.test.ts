@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, test } from "node:test";
 import { launchRun, type RunMetadata } from "./shared.ts";
 
@@ -61,9 +63,23 @@ test("the child gets the parent's PI_CODING_AGENT_DIR", () => {
 	assert.equal(launchedAgentDir(), "/custom/agent");
 });
 
-test("a relative or ~ agent dir reaches the child as an absolute path", () => {
-	process.env.PI_CODING_AGENT_DIR = "~/agent";
-	assert.equal(launchedAgentDir(), join(scratch, "home", "agent"));
-	process.env.PI_CODING_AGENT_DIR = "relative/agent";
-	assert.equal(launchedAgentDir(), resolve("relative/agent"));
+test("a relative or unexpanded ~ agent dir is refused before tmux runs", () => {
+	for (const dir of ["relative/agent", "~/agent"]) {
+		process.env.PI_CODING_AGENT_DIR = dir;
+		assert.throws(launchedAgentDir, /must be an absolute path/);
+		assert.equal(existsSync(argsLog), false);
+	}
+});
+
+test("subagent spawn refuses a relative agent dir without creating anything", () => {
+	const cli = join(dirname(fileURLToPath(import.meta.url)), "subagent.ts");
+	const result = spawnSync(process.execPath, [cli, "spawn", "--provider", "p", "--model", "m", "--prompt", "x"], {
+		cwd: scratch,
+		env: { ...process.env, PI_CODING_AGENT_DIR: "agent", PI_SUBAGENT_RUN_DIR: "" },
+		encoding: "utf8",
+	});
+	assert.equal(result.status, 1);
+	assert.match(result.stderr, /must be an absolute path/);
+	assert.equal(existsSync(join(scratch, "agent")), false);
+	assert.equal(existsSync(argsLog), false);
 });

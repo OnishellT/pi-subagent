@@ -11,7 +11,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 
 export type RunState = "starting" | "busy" | "idle" | "exited" | "error";
 
@@ -64,13 +64,19 @@ interface AssistantEntry extends SessionEntry {
 	message: AssistantMessage;
 }
 
-/** The agent dir this process uses, as an absolute path: `PI_CODING_AGENT_DIR` (with `~` expanded, like pi does) or ~/.pi/agent. */
 export function getAgentDir(): string {
-	const dir = process.env.PI_CODING_AGENT_DIR;
-	if (!dir) return join(homedir(), ".pi", "agent");
-	if (dir === "~") return homedir();
-	if (dir.startsWith("~/")) return join(homedir(), dir.slice(2));
-	return resolve(dir);
+	return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+}
+
+/**
+ * The agent dir every child gets. It must be absolute: the CLI may run in another directory than the
+ * parent pi and the child runs in the run's cwd, so a relative (or unexpanded `~`) value would name
+ * another dir for each of them. Throws instead of guessing.
+ */
+export function childAgentDir(): string {
+	const dir = getAgentDir();
+	if (!isAbsolute(dir)) throw new Error(`PI_CODING_AGENT_DIR must be an absolute path for subagents, got: ${dir}`);
+	return dir;
 }
 
 export function getRunsDir(): string {
@@ -166,6 +172,7 @@ export function tmuxSessionExists(session: string): boolean {
  * which may hold another (or a stale) PI_CODING_AGENT_DIR.
  */
 export function launchRun(metadata: RunMetadata, initialArgs: string[] = []): void {
+	const agentDir = childAgentDir();
 	let launcher = "pi";
 	const testLauncher = join(metadata.cwd, "pi-test.sh");
 	try {
@@ -191,7 +198,7 @@ export function launchRun(metadata: RunMetadata, initialArgs: string[] = []): vo
 			"--",
 			"env",
 			`PI_SUBAGENT_RUN_DIR=${metadata.runDir}`,
-			`PI_CODING_AGENT_DIR=${getAgentDir()}`,
+			`PI_CODING_AGENT_DIR=${agentDir}`,
 			launcher,
 			"--session",
 			metadata.sessionFile,

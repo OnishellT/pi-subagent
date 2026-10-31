@@ -7,6 +7,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
 	assistantText,
+	childAgentDir,
 	effectiveRunState,
 	getRunsDir,
 	inboxDir,
@@ -154,6 +155,8 @@ function spawnSubagent(args: string[]): void {
 		fail("--tools requires at least one tool name");
 	if (prompts.length === 0 && files.length === 0) fail("spawn requires at least one --prompt or --file");
 	if (!existsSync(cwd)) fail(`Working directory not found: ${cwd}`);
+	// Refuse an agent dir the child cannot share before creating anything under it.
+	childAgentDir();
 
 	const handle = generateHandle();
 	const runDir = runDirForHandle(handle);
