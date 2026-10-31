@@ -11,7 +11,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 export type RunState = "starting" | "busy" | "idle" | "exited" | "error";
 
@@ -64,8 +64,13 @@ interface AssistantEntry extends SessionEntry {
 	message: AssistantMessage;
 }
 
+/** The agent dir this process uses, as an absolute path: `PI_CODING_AGENT_DIR` (with `~` expanded, like pi does) or ~/.pi/agent. */
 export function getAgentDir(): string {
-	return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+	const dir = process.env.PI_CODING_AGENT_DIR;
+	if (!dir) return join(homedir(), ".pi", "agent");
+	if (dir === "~") return homedir();
+	if (dir.startsWith("~/")) return join(homedir(), dir.slice(2));
+	return resolve(dir);
 }
 
 export function getRunsDir(): string {
@@ -155,7 +160,11 @@ export function tmuxSessionExists(session: string): boolean {
 	return spawnSync("tmux", ["has-session", "-t", session], { stdio: "ignore" }).status === 0;
 }
 
-/** Start the child pi process for a run in its tmux session. `initialArgs` are only passed on first spawn. */
+/**
+ * Start the child pi process for a run in its tmux session. `initialArgs` are only passed on first spawn.
+ * The child always gets this process's agent dir: tmux starts it with the tmux server's environment,
+ * which may hold another (or a stale) PI_CODING_AGENT_DIR.
+ */
 export function launchRun(metadata: RunMetadata, initialArgs: string[] = []): void {
 	let launcher = "pi";
 	const testLauncher = join(metadata.cwd, "pi-test.sh");
@@ -182,7 +191,7 @@ export function launchRun(metadata: RunMetadata, initialArgs: string[] = []): vo
 			"--",
 			"env",
 			`PI_SUBAGENT_RUN_DIR=${metadata.runDir}`,
-			...(process.env.PI_CODING_AGENT_DIR ? [`PI_CODING_AGENT_DIR=${process.env.PI_CODING_AGENT_DIR}`] : []),
+			`PI_CODING_AGENT_DIR=${getAgentDir()}`,
 			launcher,
 			"--session",
 			metadata.sessionFile,
