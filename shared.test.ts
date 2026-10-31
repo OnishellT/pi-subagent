@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, test } from "node:test";
-import { launchRun, type RunMetadata } from "./shared.ts";
+import { getRunsDir, launchRun, type RunMetadata } from "./shared.ts";
 
 const saved = { PATH: process.env.PATH, HOME: process.env.HOME, PI_CODING_AGENT_DIR: process.env.PI_CODING_AGENT_DIR };
 let scratch: string;
@@ -63,12 +63,19 @@ test("the child gets the parent's PI_CODING_AGENT_DIR", () => {
 	assert.equal(launchedAgentDir(), "/custom/agent");
 });
 
-test("a relative or unexpanded ~ agent dir is refused before tmux runs", () => {
-	for (const dir of ["relative/agent", "~/agent"]) {
-		process.env.PI_CODING_AGENT_DIR = dir;
-		assert.throws(launchedAgentDir, /must be an absolute path/);
-		assert.equal(existsSync(argsLog), false);
-	}
+test("a ~ or file:// agent dir is expanded the way pi does, for the child and for finding runs", () => {
+	process.env.PI_CODING_AGENT_DIR = "~/agent";
+	assert.equal(launchedAgentDir(), join(scratch, "home", "agent"));
+	assert.equal(getRunsDir(), join(scratch, "home", "agent", "subagents"));
+	process.env.PI_CODING_AGENT_DIR = "file:///custom/agent";
+	assert.equal(launchedAgentDir(), "/custom/agent");
+	assert.equal(getRunsDir(), "/custom/agent/subagents");
+});
+
+test("a relative agent dir is refused before tmux runs", () => {
+	process.env.PI_CODING_AGENT_DIR = "relative/agent";
+	assert.throws(launchedAgentDir, /must be an absolute path/);
+	assert.equal(existsSync(argsLog), false);
 });
 
 test("subagent spawn refuses a relative agent dir without creating anything", () => {

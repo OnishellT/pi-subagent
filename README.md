@@ -80,7 +80,7 @@ Optional spawn flags:
 - `--no-prompt-templates`: disable prompt templates
 - `--no-context-files`: ignore repository instruction files
 
-Nested subagents are disabled. Child sessions do not receive the subagent skill. Children survive `/reload`. When their spawning Pi session quits or is replaced, running children are suspended: the process stops, but transcript and metadata are kept. Resuming that parent session relaunches them idle with their full history. `subagent stop` removes a run permanently. Children always run with the parent's agent dir (`PI_CODING_AGENT_DIR`, or `~/.pi/agent` when it is unset), whatever the tmux server's environment holds; `spawn` refuses a `PI_CODING_AGENT_DIR` that is not an absolute path.
+Nested subagents are disabled. Child sessions do not receive the subagent skill. Children survive `/reload`. When their spawning Pi session quits or is replaced, running children are suspended: the process stops, but transcript and metadata are kept. Resuming that parent session relaunches them idle with their full history. `subagent stop` removes a run permanently. Children always run with the parent's agent dir (`PI_CODING_AGENT_DIR`, or `~/.pi/agent` when it is unset), whatever the tmux server's environment holds; `~` and `file://` values are expanded as Pi does, and `spawn` refuses a relative one.
 
 ## Development
 

@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export type RunState = "starting" | "busy" | "idle" | "exited" | "error";
 
@@ -64,14 +65,20 @@ interface AssistantEntry extends SessionEntry {
 	message: AssistantMessage;
 }
 
+/** The agent dir as pi reads it: PI_CODING_AGENT_DIR with `~` and a file:// URL expanded, or ~/.pi/agent. */
 export function getAgentDir(): string {
-	return process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+	const dir = process.env.PI_CODING_AGENT_DIR;
+	if (!dir) return join(homedir(), ".pi", "agent");
+	if (dir === "~") return homedir();
+	if (dir.startsWith("~/")) return join(homedir(), dir.slice(2));
+	if (dir.startsWith("file://")) return fileURLToPath(dir);
+	return dir;
 }
 
 /**
  * The agent dir every child gets. It must be absolute: the CLI may run in another directory than the
- * parent pi and the child runs in the run's cwd, so a relative (or unexpanded `~`) value would name
- * another dir for each of them. Throws instead of guessing.
+ * parent pi and the child runs in the run's cwd, so a relative value would name another dir for each
+ * of them. Throws instead of guessing.
  */
 export function childAgentDir(): string {
 	const dir = getAgentDir();
